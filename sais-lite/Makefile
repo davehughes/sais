@@ -15,7 +15,7 @@ LIBPATH = ../lib
 
 # targets
 .PHONY: all
-all: suftest
+all: directory suftest dll
 suftest: sais.o suftest.o
 dll: suftest
 	$(CC) -shared -Wl,-soname,libsais.so -o $(LIBPATH)/libsais.so *.o
@@ -23,7 +23,8 @@ test:
 	$(CC) -O -g -Wall test.c sais.c -o test
 	./test
 	$(RM) test test.exe
-
+directory:
+	test -d $(LIBPATH) || mkdir $(LIBPATH)
 distclean: clean
 clean:
 	$(RM) suftest suftest.exe test test.exe sais.o suftest.o
