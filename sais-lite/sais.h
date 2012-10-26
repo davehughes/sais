@@ -31,6 +31,8 @@
 extern "C" {
 #endif /* __cplusplus */
 
+#include <sys/queue.h>
+
 /* find the suffix array SA of T[0..n-1]
    use a working space (excluding T and SA) of at most 2n+O(lg n) */
 int
@@ -53,6 +55,24 @@ compute_lcp(const unsigned char * T, const int *SA, int *LCP, int n);
 
 //int compute_lcp_int(const int *SA, int *LCP, int start, int lengt
 
+
+typedef struct Run {
+    int start;
+    int length;
+    STAILQ_ENTRY(Run) list_entry;
+} Run;
+
+typedef STAILQ_HEAD(RunList, Run) RunList;
+
+RunList *
+findCommonSeqsByLength(const int *LCP, int n);
+
+void testCommonSeqs();
+
+void
+find_best_subsequence_matches(const unsigned char *S1, const int *SA1, int n1, 
+                              const unsigned char *S2, const int *SA2, int n2,
+                              int *bestMatchIndices, int *bestMatchLCPs);
 
 #ifdef __cplusplus
 } /* extern "C" */

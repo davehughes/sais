@@ -40,5 +40,21 @@ class TestSuffixArrays(unittest.TestCase):
         self.assertEqual([-1, 0, 1, 3, 0, 0, 2], lcp[:len(seq)])
 
 
+
+class TestSequenceMatching(unittest.TestCase):
+
+    def testSimpleMatch(self):
+        s1 = sais.Sequence(''.join(generate_sequence(length=1000)))
+        s2 = sais.Sequence(''.join(generate_sequence(length=1000)))
+        match_tuples = sais.find_best_subsequence_matches(s1, s2)
+
+        # scan to make sure lcp matches
+        for idx, (match, lcp) in enumerate(match_tuples):
+            match_idx1 = s1.suffix_array[match]
+            match_idx2 = s2.suffix_array[idx]
+            self.assertEqual(s1.seq[match_idx1: match_idx1 + lcp],
+                             s2.seq[match_idx2: match_idx2 + lcp])
+
+
 if __name__ == '__main__':
     unittest.main()

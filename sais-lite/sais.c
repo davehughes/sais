@@ -26,8 +26,10 @@
 
 #include <assert.h>
 #include <stdlib.h>
+#include <sys/queue.h>
 #include "sais.h"
-//#include <stdio.h>
+#include <stdio.h>
+#include <string.h>
 
 #ifndef UCHAR_SIZE
 # define UCHAR_SIZE 256
@@ -556,4 +558,135 @@ compute_lcp(const unsigned char *T, const int *SA, int *LCP, int n) {
 
     free(rank);
     return 0;
+}
+
+void insert_run(RunList *runs, int start, int length, int threshold) {
+    Run *current = malloc(sizeof(Run));
+    current->start = start;
+    current->length = length;
+    STAILQ_INSERT_TAIL(runs, current, list_entry);
+    printf("Inserting run: start -> %i, length -> %i, threshold -> %i\n", start, length, threshold);
+}
+
+void
+findCommonSeqsByLengthInt(const int *LCP, RunList * runs, const int offset, int length, int threshold) {
+    // return:
+    //   list (technically, STAILQ) of Run sequences, i.e. [{ start -> 4, length -> 5 }, ...]
+    // 
+    // this is quick shorthand which can be used to retrieve the substrings: SEQ[4:4+5]
+    int i, runstart = -1;
+    for(i = offset; i < offset + length; i++) {
+        if(LCP[i] >= threshold) {
+            runstart = (runstart < 0) ? i : runstart;  // if no run is started, start one
+        } else if (runstart >= 0) {  // the current run ended with the previous element
+            insert_run(runs, runstart, i-runstart, threshold);
+            findCommonSeqsByLengthInt(LCP, runs, runstart, i-runstart, threshold+1);
+            runstart = -1;
+        }
+    }
+    
+    // finish processing any remaining run
+    if (runstart >= 0) {
+        int runlength = (offset + length) - runstart;
+        insert_run(runs, runstart, runlength, threshold);
+        findCommonSeqsByLengthInt(LCP, runs, runstart, runlength, threshold+1);
+    }
+}
+
+RunList *
+findCommonSeqsByLength(const int *LCP, int n) {
+    RunList *runs = malloc(sizeof(RunList));
+    STAILQ_INIT(runs);
+    findCommonSeqsByLengthInt(LCP, runs, 0, n, 1);
+    return runs;
+}
+
+typedef struct LCPComparison {
+    int cmp;
+    int lcp;
+} LCPComparison;
+
+void
+print_suffix(const unsigned char *S, int n, int sindex) {
+    int i;
+    for(i = sindex; i < n; i++) {
+        putchar((int)S[i]);
+    }
+    puts("\n");
+}
+
+
+/*
+ * String comparison method that simultaneously computes the LCP between the
+ * compared strings and returns it as part of an LCPComparison structure. Also
+ * adjusts the LCP to exclude a match on the terminator $.
+ */
+LCPComparison
+lcp_strncmp(const unsigned char *S1, int len1,
+            const unsigned char *S2, int len2) {
+    int i=0, j=0, lcp=0, cmp;
+    
+    // Walk the strings while they match, incrementing lcp
+    while(i < len1 && j < len2 && S1[i] == S2[j]) { i++; j++; lcp++; }
+
+    // Compare the next character, if possible
+    if      (i == len1) { cmp = (j == len2) ? 0 : -1; }
+    else if (j == len2) { cmp = 1; }
+    else                { cmp = S2[j] - S1[i]; }
+
+    // Adjust LCP for an exact suffix match, since $ isn't really supposed to
+    // be part of the comparison string
+    if(cmp == 0 && S1[len1-1] == '$') { lcp--; }
+
+    LCPComparison lcpCmp = {cmp, lcp};
+    return lcpCmp;
+}
+
+void
+find_best_subsequence_matches(const unsigned char *S1, const int *SA1, int n1, 
+                              const unsigned char *S2, const int *SA2, int n2,
+                              int *bestMatches, int *bestMatchLCPs) {
+    /*
+     * For each suffix referenced in SA2, determine the pair of suffixes in 
+     * SA1 that would precede/follow it in lexicographic order.  Find the
+     * one with the highest LCP, store its index in bestMatches, then store
+     * the LCP in bestMatchLCPs.
+     *
+     * Upon returning from this function, bestMatches[i] will contain the index
+     * in SA1 of the closest suffix match to the suffix SA2[i].  bestMatchLCPs[i]
+     * will contain the length of the longest common prefix between these 
+     * suffixes.
+     */
+    int i=0, j=0;
+    LCPComparison cmp, cmp2;
+
+    while(i < n1 && j < n2) {
+        cmp = lcp_strncmp(&S1[SA1[i]], n1-SA1[i], &S2[SA2[j]], n2-SA2[j]);
+        if (cmp.cmp >= 0) { 
+            i++;
+        } else {
+            bestMatches[j] = i;
+            bestMatchLCPs[j] = cmp.lcp;
+
+            if(i > 0) {
+                cmp2 = lcp_strncmp(&S1[SA1[i-1]], n1-SA1[i-1], &S2[SA2[j]], n2-SA2[j]);
+                if (cmp2.lcp >= cmp.lcp) {
+                    bestMatches[j] = i - 1;
+                    bestMatchLCPs[j] = cmp2.lcp;
+                }
+            }
+            j++; 
+        }
+    }
+
+    // Add any remaining suffixes from SA2 to the end
+    while(j < n2) {
+        cmp = lcp_strncmp(&S1[SA1[n1-1]], 1, &S2[SA2[j]], n2-SA2[j]);
+        bestMatches[j] = n1-1;
+        bestMatchLCPs[j] = cmp.lcp;
+        j++;
+    }
+}
+
+void testCommonSeqs() {
 }

@@ -40,15 +40,29 @@ class Sequence(object):
     @property
     def lcp_array(self):
         if not getattr(self, '_lcp_array', None):
-            lcp_array = malloc(len(self.seq), c_int)
+            lcp_array = malloc(len(self), c_int)
             status = SAIS.compute_lcp(c_char_p(self.seq),
                                       self.suffix_array,
                                       lcp_array,
-                                      len(self.seq))
+                                      len(self))
             if status:
                 raise Exception("Error code %s encountered while constructing lcp array", status)
             self._lcp_array = lcp_array
         return self._lcp_array
 
+    def suffix(self, start=0, length=-1):
+        if length < 0:
+            length = len(self) - start
+        return self.seq[start:start+length]
+
     def __len__(self):
         return len(self.seq)
+
+def find_best_subsequence_matches(seq1, seq2):
+    matches = malloc(len(seq2), c_int)
+    lcps = malloc(len(seq2), c_int)
+    SAIS.find_best_subsequence_matches(seq1.seq, seq1.suffix_array, len(seq1),
+                                       seq2.seq, seq2.suffix_array, len(seq2),
+                                       matches, lcps)
+    return [(matches[i], lcps[i]) for i in range(len(seq2))]
+
